@@ -1,6 +1,8 @@
 const express = require('express');
 const cors = require('cors');
-const puppeteer = require('puppeteer');
+// Use puppeteer-core and @sparticuz/chromium for Render compatibility
+const puppeteer = require('puppeteer-core');
+const chromium = require('@sparticuz/chromium');
 const fs = require('fs');
 const path = require('path');
 const handlebars = require('handlebars');
@@ -12,7 +14,7 @@ app.use(express.json({ limit: '50mb' }));
 app.post('/api/generate-pdf', async (req, res) => {
   try {
     const data = req.body;
-    
+
     // Format the address for HTML line breaks
     if (data.companyAddress) {
       data.companyAddressFormatted = data.companyAddress.replace(/\n/g, '<br>');
@@ -20,7 +22,7 @@ app.post('/api/generate-pdf', async (req, res) => {
     if (!data.goodsDescriptions) {
       data.goodsDescriptions = '&nbsp;';
     }
-    
+
     // Read and compile template
     const templatePath = path.join(__dirname, 'template.html');
     const templateSource = fs.readFileSync(templatePath, 'utf8');
@@ -28,32 +30,17 @@ app.post('/api/generate-pdf', async (req, res) => {
     const htmlContent = template(data);
 
     // Launch puppeteer
-   const browser = await puppeteer.launch({
-      headless: 'new',
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    // Launch puppeteer with sparticuz/chromium for serverless compatibility
+    const browser = await puppeteer.launch({
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath(),
+      headless: chromium.headless,
+      ignoreHTTPSErrors: true,
     });
 
-    
-    let browser;
-    if (process.env.RENDER || process.env.NODE_ENV === 'production') {
-      const chromium = require('@sparticuz/chromium');
-      const puppeteerCore = require('puppeteer-core');
-      browser = await puppeteerCore.launch({
-        args: chromium.args,
-        defaultViewport: chromium.defaultViewport,
-        executablePath: await chromium.executablePath(),
-        headless: chromium.headless,
-        ignoreHTTPSErrors: true,
-      });
-    } else {
-      browser = await puppeteer.launch({
-        headless: 'new',
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
-      });
-    }
-    
     const page = await browser.newPage();
-    
+
     await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
 
     const pdfBuffer = await page.pdf({
