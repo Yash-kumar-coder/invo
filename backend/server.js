@@ -28,7 +28,7 @@ app.post('/api/generate-pdf', async (req, res) => {
     const htmlContent = template(data);
 
     // Launch puppeteer with Render-compatible settings
-    const browser = await puppeteer.launch({
+    const launchOptions = {
       headless: 'new',
       args: [
         '--no-sandbox',
@@ -45,8 +45,13 @@ app.post('/api/generate-pdf', async (req, res) => {
         '--disable-prompt-on-repost',
         '--disable-sync'
       ],
-    });
-    
+    };
+    const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || process.env.CHROME_PATH;
+    if (executablePath) {
+      launchOptions.executablePath = executablePath;
+    }
+
+    const browser = await puppeteer.launch(launchOptions);
     const page = await browser.newPage();
     
     await page.setContent(htmlContent, { waitUntil: 'domcontentloaded' });
@@ -73,7 +78,11 @@ app.post('/api/generate-pdf', async (req, res) => {
 
   } catch (error) {
     console.error('Error generating PDF:', error);
-    res.status(500).json({ error: 'Failed to generate PDF', details: error.message });
+    res.status(500).json({
+      error: 'Failed to generate PDF',
+      message: error.message,
+      ...(process.env.NODE_ENV === 'development' ? { stack: error.stack } : {}),
+    });
   }
 });
 
