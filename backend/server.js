@@ -1,8 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-// Use puppeteer-core and @sparticuz/chromium for Render compatibility
-const puppeteer = require('puppeteer-core');
-const chromium = require('@sparticuz/chromium');
+const puppeteer = require('puppeteer');
 const fs = require('fs');
 const path = require('path');
 const handlebars = require('handlebars');
@@ -14,7 +12,7 @@ app.use(express.json({ limit: '50mb' }));
 app.post('/api/generate-pdf', async (req, res) => {
   try {
     const data = req.body;
-
+    
     // Format the address for HTML line breaks
     if (data.companyAddress) {
       data.companyAddressFormatted = data.companyAddress.replace(/\n/g, '<br>');
@@ -22,26 +20,36 @@ app.post('/api/generate-pdf', async (req, res) => {
     if (!data.goodsDescriptions) {
       data.goodsDescriptions = '&nbsp;';
     }
-
+    
     // Read and compile template
     const templatePath = path.join(__dirname, 'template.html');
     const templateSource = fs.readFileSync(templatePath, 'utf8');
     const template = handlebars.compile(templateSource);
     const htmlContent = template(data);
 
-    // Launch puppeteer
-    // Launch puppeteer with sparticuz/chromium for serverless compatibility
+    // Launch puppeteer with Render-compatible settings
     const browser = await puppeteer.launch({
-      args: chromium.args,
-      defaultViewport: chromium.defaultViewport,
-      executablePath: await chromium.executablePath(),
-      headless: chromium.headless,
-      ignoreHTTPSErrors: true,
+      headless: 'new',
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--single-process',
+        '--disable-background-networking',
+        '--disable-breakpad',
+        '--disable-client-side-phishing-detection',
+        '--disable-default-apps',
+        '--disable-hang-monitor',
+        '--disable-popup-blocking',
+        '--disable-prompt-on-repost',
+        '--disable-sync'
+      ],
     });
-
+    
     const page = await browser.newPage();
-
-    await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+    
+    await page.setContent(htmlContent, { waitUntil: 'domcontentloaded' });
 
     const pdfBuffer = await page.pdf({
       format: 'A4',
@@ -65,7 +73,7 @@ app.post('/api/generate-pdf', async (req, res) => {
 
   } catch (error) {
     console.error('Error generating PDF:', error);
-    res.status(500).json({ error: 'Failed to generate PDF' });
+    res.status(500).json({ error: 'Failed to generate PDF', details: error.message });
   }
 });
 
