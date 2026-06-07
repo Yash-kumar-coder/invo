@@ -92,7 +92,7 @@ export default function App() {
   const downloadPDF = async () => {
     try {
       setIsGenerating(true);
-      const response = await axios.post("http://localhost:5000/api/generate-pdf", formData, {
+      const response = await axios.post("https://invo-frontend.onrender.com/api/generate-pdf", formData, {
         responseType: "blob",
       });
       const url = window.URL.createObjectURL(new Blob([response.data]));
